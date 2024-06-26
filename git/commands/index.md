@@ -128,6 +128,25 @@ git branch -m master main
 git branch -M [old-branch-name] [new-branch-name]
 ```
 
+### 親ブランチ確認
+
+```bash
+git show-branch | grep '*' | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -1 | awk -F'[]~^[]' '{print $2}'
+```
+
+### 親ブランチ変更
+
+```bash
+git rebase [branch-name]
+```
+
+### リモートで削除されたブランチをローカルからも削除
+
+```bash
+git switch main && git pull && git fetch --prune && git branch -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -d
+```
+
+
 ## 変更管理
 
 ### ステージ
@@ -239,18 +258,6 @@ git ls-remote --tags
 ```bash
 git config --add merge.ff false
 git config --add pull.ff only
-```
-
-### 親ブランチ確認
-
-```bash
-git show-branch | grep '*' | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -1 | awk -F'[]~^[]' '{print $2}'
-```
-
-### リモートで削除されたブランチをローカルからも削除
-
-```bash
-git switch main && git pull && git fetch --prune && git branch -vv | grep ': gone]' | awk '{print $1}' | xargs -r git branch -d
 ```
 
 ### git管理から除外せず、ワークツリーの変更を無視（リモートが更新されても上書きしない）
