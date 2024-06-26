@@ -1,1 +1,1 @@
-- [Git管理](./git/index.md)
+- [Git](./git/index.md)
