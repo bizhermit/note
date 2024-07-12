@@ -17,5 +17,5 @@ http接続時は`crypto.randomUUID`が使えない。httpsの場合は大丈夫�
 const getRandomUUID = crypto.randomUUID?.bind(crypto) ?? generateUuidV4;
 ```
 
-みたいな感じで対処が必要。
+みたいな感じで代替関数が必要。
 ChromeやEdgeでは再現しない。
