@@ -1,10 +1,9 @@
 name: "Cascade Merge: v0 -> v1"
 
 on:
-  pull_request:
+  push:
     branches:
       - "support/v0"
-    types: [closed]
 
 concurrency:
   group: cascade-v0-to-v1
@@ -16,14 +15,17 @@ permissions:
 
 jobs:
   merge:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    env:
+      HEAD_BRANCH: "support/v0" # マージ元（旧バージョン）
+      BASE_BRANCH: "support/v1" # マージ先（新バージョン）
     steps:
       - name: Checkout target branch
         uses: actions/checkout@v4
         with:
-          ref: support/v1
+          ref: support/v1 # env が使えないため、BASE_BRANCH と同じ値を記述する
           fetch-depth: 0
+          token: ${{ secrets.PA_TOKEN }} # カスケードマージを連鎖させるためにPATが必要
 
       - name: Configure Git
         run: |
@@ -32,20 +34,21 @@ jobs:
 
       - name: Try Merge or Create PR
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PA_TOKEN }}
         run: |
-          git fetch origin support/v0
-          echo "Attempting to merge support/v0 into support/v1..."
-          if git merge origin/support/v0 --no-edit; then
-            echo "✅ Merge successful. Pushing to support/v1..."
-            git push origin support/v1
+          git fetch origin ${HEAD_BRANCH}
+          echo "Attempting to merge ${HEAD_BRANCH} into ${BASE_BRANCH}..."
+          if git merge origin/${HEAD_BRANCH} --no-edit; then
+            echo "✅ Merge successful. Pushing to ${BASE_BRANCH}..."
+            git push origin ${BASE_BRANCH}
           else
             echo "⚠️ Merge failed (Conflict). Creating Pull Request..."
             git merge --abort
+            gh label create "auto-merge-conflict" --color "b60205" --description "Created by CI" || true
             gh pr create \
-              --base support/v1 \
-              --head support/v0 \
-              --title "🔀 Auto-merge: support/v0 to support/v1" \
+              --base ${BASE_BRANCH} \
+              --head ${HEAD_BRANCH} \
+              --title "🔀 Auto-merge: ${HEAD_BRANCH} to ${BASE_BRANCH}" \
               --body "Automatic merge failed due to conflicts. Please resolve manually." \
               --label "auto-merge-conflict" \
               || echo "PR likely already exists."
