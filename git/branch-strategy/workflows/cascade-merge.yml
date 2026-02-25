@@ -25,6 +25,7 @@ jobs:
         with:
           ref: support/v1 # env が使えないため、BASE_BRANCH と同じ値を記述する
           fetch-depth: 0
+          token: ${{ secrets.PA_TOKEN }}
 
       - name: Configure Git
         run: |
