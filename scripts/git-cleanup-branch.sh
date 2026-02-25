@@ -21,26 +21,24 @@ git fetch --prune
 
 # 削除対象ブランチ抽出
 gone_branches=$(
-  git branch -vv \
-    | grep ': gone]' \
-    | sed 's/^[* ]*//' \
-    | awk '{print $1}'
+  git for-each-ref --format '%(refname:short) %(upstream:track)' refs/heads \
+  | awk '$2 == "[gone]" {print $1}'
 )
 
 if [ -z "$gone_branches" ]; then
   echo
   echo "No branches to delete."
-  exit 0
+else
+  echo
+  echo "Deleting branches:"
+  for branch in $gone_branches; do
+    echo "  - $branch"
+    if ! git branch -d "$branch"; then
+      echo "    Failed (maybe not fully merged)"
+    fi
+  done
 fi
 
 echo
-echo "Deleting branches:"
-for branch in $gone_branches; do
-  echo "  - $branch"
-  if ! git branch -d "$branch"; then
-    echo "    Failed (maybe not fully merged)"
-  fi
-done
-
-echo
 echo "Done!"
+echo
