@@ -1,12 +1,13 @@
-name: "Cascade Merge: v0 -> v1"
+name: "Auto Cascade Merge"
 
 on:
   push:
     branches:
-      - "support/v0"
+      - "support/*"
 
+# 同一ブランチに対する重複実行を防ぐ
 concurrency:
-  group: cascade-v0-to-v1
+  group: cascade-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -14,37 +15,93 @@ permissions:
   pull-requests: write
 
 jobs:
-  merge:
+  cascade-merge:
     runs-on: ubuntu-latest
-    env:
-      HEAD_BRANCH: "support/v0" # マージ元（旧バージョン）
-      BASE_BRANCH: "support/v1" # マージ先（新バージョン）
     steps:
-      - name: Checkout target branch
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: support/v1 # env が使えないため、BASE_BRANCH と同じ値を記述する
-          fetch-depth: 0
-          token: ${{ secrets.PA_TOKEN }} # カスケードマージを連鎖させるためにPATが必要
+          fetch-depth: 0 # 全ブランチの情報を取得するために必須
+          token: ${{ secrets.PA_TOKEN }} # 次のActionをトリガーするためにPATを使用
 
       - name: Configure Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      - name: Try Merge or Create PR
+      - name: Determine Next Version Branch
+        id: determine-target
+        run: |
+          # 現在のブランチ名（プッシュされたブランチ）
+          CURRENT_BRANCH="${{ github.ref_name }}"
+          echo "Current Branch: $CURRENT_BRANCH"
+
+          # リモートブランチを取得し、更新
+          git fetch --prune
+
+          # support/ 系のブランチ一覧を取得し、バージョン順(sort -V)に並べる
+          # sedで 'origin/' を削除して純粋なブランチ名リストを作る
+          BRANCH_LIST=$(git branch -r | grep "origin/support/" | sed 's/  origin\///' | sort -V)
+          
+          echo "Detected Support Branches:"
+          echo "$BRANCH_LIST"
+
+          # 次のブランチを探すロジック
+          TARGET_BRANCH=""
+          FOUND_CURRENT=false
+          
+          # リストをループして「自分の次」を見つける
+          while IFS= read -r branch; do
+            if [ "$FOUND_CURRENT" = true ]; then
+              TARGET_BRANCH="$branch"
+              break
+            fi
+            
+            if [ "$branch" = "$CURRENT_BRANCH" ]; then
+              FOUND_CURRENT=true
+            fi
+          done <<< "$BRANCH_LIST"
+
+          if [ -z "$TARGET_BRANCH" ]; then
+            echo "ℹ️ This is the latest version. No target branch to merge into."
+            echo "HAS_TARGET=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Target Branch Found: $TARGET_BRANCH"
+            echo "HAS_TARGET=true" >> $GITHUB_OUTPUT
+            echo "BASE_BRANCH=$TARGET_BRANCH" >> $GITHUB_OUTPUT
+            echo "HEAD_BRANCH=$CURRENT_BRANCH" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Merge to Next Version
+        # ターゲットが見つかった場合のみ実行
+        if: steps.determine-target.outputs.HAS_TARGET == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.PA_TOKEN }}
+          HEAD_BRANCH: ${{ steps.determine-target.outputs.HEAD_BRANCH }}
+          BASE_BRANCH: ${{ steps.determine-target.outputs.BASE_BRANCH }}
         run: |
-          git fetch origin ${HEAD_BRANCH}
+          echo "==========================================="
+          echo "🚀 Starting Cascade Merge"
+          echo "From: $HEAD_BRANCH"
+          echo "To  : $BASE_BRANCH"
+          echo "==========================================="
+
+          # マージ先ブランチをチェックアウト
+          git checkout $BASE_BRANCH
+
+          # マージ実行
           echo "Attempting to merge ${HEAD_BRANCH} into ${BASE_BRANCH}..."
+          
           if git merge origin/${HEAD_BRANCH} --no-edit; then
             echo "✅ Merge successful. Pushing to ${BASE_BRANCH}..."
             git push origin ${BASE_BRANCH}
           else
             echo "⚠️ Merge failed (Conflict). Creating Pull Request..."
             git merge --abort
+            
+            # ラベルが存在するか確認し、なければ作成（エラー無視）
             gh label create "auto-merge-conflict" --color "b60205" --description "Created by CI" || true
+            
             gh pr create \
               --base ${BASE_BRANCH} \
               --head ${HEAD_BRANCH} \
