@@ -1,0 +1,52 @@
+name: "Cascade Merge: v0 -> v1"
+
+on:
+  pull_request:
+    branches:
+      - "support/v0"
+    types: [closed]
+
+concurrency:
+  group: cascade-v0-to-v1
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: support/v1
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Try Merge or Create PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin support/v0
+          echo "Attempting to merge support/v0 into support/v1..."
+          if git merge origin/support/v0 --no-edit; then
+            echo "✅ Merge successful. Pushing to support/v1..."
+            git push origin support/v1
+          else
+            echo "⚠️ Merge failed (Conflict). Creating Pull Request..."
+            git merge --abort
+            gh pr create \
+              --base support/v1 \
+              --head support/v0 \
+              --title "🔀 Auto-merge: support/v0 to support/v1" \
+              --body "Automatic merge failed due to conflicts. Please resolve manually." \
+              --label "auto-merge-conflict" \
+              || echo "PR likely already exists."
+          fi
