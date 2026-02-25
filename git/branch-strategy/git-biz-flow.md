@@ -35,7 +35,7 @@ git fetch
 git merge support/v0
 ```
 
-自動化用GitHubAction: [merge-workflow](./merge-workflow.yml)
+自動化用GitHubAction: [cascade-merge.yml](./workflows/cascade-merge.yml)
 
 ### feature(s)
 
@@ -45,6 +45,7 @@ git merge support/v0
 featureブランチおよびtestブランチで実装およびテストが終わり次第、元のsupportブランチでリベースして最新化した後、PRを作成・マージする。  
 supportブランチへマージ後に削除する。  
 ブランチ名は元となるsupportブランチを辿れるように `feature/<supportブランチ名（バージョン）>/<任意の名前>` とする。  
+PR作成時にバージョンチェックするGitHubAction: [branch-version-check.yml](./workflows/branch-version-check.yml)  
 
 supportブランチに未マージの場合、リベースでリリースバージョンを変更対応可能。  
 
