@@ -1,10 +1,9 @@
 name: "Cascade Merge: v0 -> v1"
 
 on:
-  pull_request:
+  push:
     branches:
       - "support/v0"
-    types: [closed]
 
 concurrency:
   group: cascade-v0-to-v1
@@ -16,7 +15,6 @@ permissions:
 
 jobs:
   merge:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     env:
       HEAD_BRANCH: "support/v0" # マージ元（旧バージョン）
