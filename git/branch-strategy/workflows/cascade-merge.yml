@@ -25,7 +25,7 @@ jobs:
         with:
           ref: support/v1 # env が使えないため、BASE_BRANCH と同じ値を記述する
           fetch-depth: 0
-          token: ${{ secrets.PA_TOKEN }}
+          token: ${{ secrets.PA_TOKEN }} # カスケードマージを連鎖させるためにPATが必要
 
       - name: Configure Git
         run: |
@@ -34,7 +34,7 @@ jobs:
 
       - name: Try Merge or Create PR
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PA_TOKEN }}
         run: |
           git fetch origin ${HEAD_BRANCH}
           echo "Attempting to merge ${HEAD_BRANCH} into ${BASE_BRANCH}..."
@@ -44,7 +44,7 @@ jobs:
           else
             echo "⚠️ Merge failed (Conflict). Creating Pull Request..."
             git merge --abort
-            
+            gh label create "auto-merge-conflict" --color "b60205" --description "Created by CI" || true
             gh pr create \
               --base ${BASE_BRANCH} \
               --head ${HEAD_BRANCH} \
