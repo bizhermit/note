@@ -2,7 +2,7 @@ name: "Merge Branch Rule Check"
 
 on:
   pull_request:
-    types: [opened, synchronized, reopened, edited]
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   merge-branch-check:
